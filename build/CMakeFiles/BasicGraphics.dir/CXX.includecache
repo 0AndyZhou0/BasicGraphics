@@ -1,0 +1,40 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/andy/Desktop/github/BasicGraphics/BasicGraphics.cpp
+iostream
+-
+fstream
+-
+sstream
+-
+thread
+-
+vector
+-
+GL/glew.h
+-
+GLFW/glfw3.h
+-
+glm/glm.hpp
+/home/andy/Desktop/github/BasicGraphics/glm/glm.hpp
+assimp/Importer.hpp
+-
+assimp/scene.h
+-
+assimp/postprocess.h
+-
+glm/gtc/matrix_transform.hpp
+/home/andy/Desktop/github/BasicGraphics/glm/gtc/matrix_transform.hpp
+glm/gtx/transform.hpp
+/home/andy/Desktop/github/BasicGraphics/glm/gtx/transform.hpp
+glm/gtx/string_cast.hpp
+/home/andy/Desktop/github/BasicGraphics/glm/gtx/string_cast.hpp
+glm/gtc/type_ptr.hpp
+/home/andy/Desktop/github/BasicGraphics/glm/gtc/type_ptr.hpp
+

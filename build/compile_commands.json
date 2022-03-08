@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/andy/Desktop/github/BasicGraphics/build",
+  "command": "/bin/x86_64-linux-gnu-g++-9  -DGLEW_STATIC -I/include -I/home/andy/Desktop/github/BasicGraphics/.   -std=c++17 -g   -o CMakeFiles/BasicGraphics.dir/BasicGraphics.cpp.o -c /home/andy/Desktop/github/BasicGraphics/BasicGraphics.cpp",
+  "file": "/home/andy/Desktop/github/BasicGraphics/BasicGraphics.cpp"
+}
+]

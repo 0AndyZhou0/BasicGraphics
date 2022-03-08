@@ -1,0 +1,7 @@
+/home/andy/Desktop/github/BasicGraphics/build/CMakeFiles/install/strip.dir
+/home/andy/Desktop/github/BasicGraphics/build/CMakeFiles/install/local.dir
+/home/andy/Desktop/github/BasicGraphics/build/CMakeFiles/install.dir
+/home/andy/Desktop/github/BasicGraphics/build/CMakeFiles/list_install_components.dir
+/home/andy/Desktop/github/BasicGraphics/build/CMakeFiles/rebuild_cache.dir
+/home/andy/Desktop/github/BasicGraphics/build/CMakeFiles/edit_cache.dir
+/home/andy/Desktop/github/BasicGraphics/build/CMakeFiles/BasicGraphics.dir
