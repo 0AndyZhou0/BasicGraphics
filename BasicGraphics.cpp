@@ -40,6 +40,11 @@ struct MeshGL {
 //Global Variables
 float rotAngle = 0.0;
 
+glm::vec3 eye(0,0,1);
+glm::vec3 lookAt(0,0,0);
+
+glm::vec2 mousePos;
+
 //Debugging Functions
 void aiMatToGLM4(aiMatrix4x4 &a, glm::mat4 &m) {
 	for(int i = 0; i < 4; i++) {
@@ -441,6 +446,14 @@ glm::mat4 makeRotateZ(glm::vec3 offset) {
 	transform = glm::rotate(glm::radians(rotAngle), glm::vec3(0,0,1)) * transform;
 	transform = glm::translate(offset) * transform;
 	return transform;
+}
+
+glm::mat4 makeLocalRotate(glm::vec3 offset, glm::vec3 axis, float angle) {
+	if(axis == glm::vec3(1,0,0)) {
+		glm::mat4 transform = glm::translate(-offset);
+		transform = glm::rotate(glm::radians(rotAngle), axis) * transform;
+		transform = glm::translate(offset) * transform;
+	}
 }
 
 // Key Callbacks
