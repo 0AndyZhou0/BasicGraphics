@@ -449,11 +449,44 @@ glm::mat4 makeRotateZ(glm::vec3 offset) {
 }
 
 glm::mat4 makeLocalRotate(glm::vec3 offset, glm::vec3 axis, float angle) {
-	if(axis == glm::vec3(1,0,0)) {
-		glm::mat4 transform = glm::translate(-offset);
-		transform = glm::rotate(glm::radians(rotAngle), axis) * transform;
-		transform = glm::translate(offset) * transform;
-	}
+	glm::mat4 transform = glm::translate(-offset);
+	transform = glm::rotate(glm::radians(angle), axis) * transform;
+	transform = glm::translate(offset) * transform;
+	return transform;
+}
+
+//Mouse Callback
+static void mouse_position_callback(GLFWwindow* window, double xpos, double ypos) {
+	//cout << mousePos[0] << " " << mousePos[1] << endl;
+	//cout << xpos << " " << ypos << endl;
+	
+	double xmov = mousePos[0] - xpos;
+	double ymov = mousePos[1] - ypos;
+
+	//if(xmov > 1 || ymov > 1) {
+	//	xmov = 0;
+	//	ymov = 0;
+	//}
+
+	cout << xmov << " " << ymov << endl;
+
+	int fw, fh;
+    glfwGetFramebufferSize(window, &fw, &fh);
+	if(fw > 0 && fh > 0) {
+        double relxpos = xmov / fw;
+        double relypos = ymov / fh;
+        
+		glm::mat4 relxmot = makeLocalRotate(eye, glm::vec3(0,1,0), 30.0 * relxpos);
+		glm::mat4 relymot = makeLocalRotate(eye, glm::cross(glm::vec3(0,1,0), eye - lookAt), 30.0 * relypos);
+
+		glm::vec4 lookAtV = glm::vec4(lookAt, 1.0);
+		lookAtV = relymot * relxmot * lookAtV;
+		lookAt = glm::vec3(lookAtV);
+    }
+
+	mousePos[0] = xpos;
+	mousePos[1] = ypos;
+	//glfwSetCursorPos(window, 0, 0); 
 }
 
 // Key Callbacks
@@ -466,6 +499,26 @@ static void key_callback(GLFWwindow *window,
         if(key == GLFW_KEY_ESCAPE) {
             glfwSetWindowShouldClose(window, true);
         }
+		else if(key == GLFW_KEY_W) {
+			glm::vec3 direction = (lookAt - eye) * glm::vec3(0.1, 0.1, 0.1);
+			lookAt += direction;
+			eye += direction;
+		}
+		else if(key == GLFW_KEY_A) {
+			glm::vec3 direction = (glm::cross(eye - lookAt, glm::vec3(0,1,0))) * glm::vec3(0.1, 0.1, 0.1);
+			lookAt += direction;
+			eye += direction;
+		}
+		else if(key == GLFW_KEY_S) {
+			glm::vec3 direction = (eye - lookAt) * glm::vec3(0.1, 0.1, 0.1);
+			lookAt += direction;
+			eye += direction;
+		}
+		else if(key == GLFW_KEY_D) {
+			glm::vec3 direction = (glm::cross(glm::vec3(0,1,0), eye - lookAt)) * glm::vec3(0.1, 0.1, 0.1);
+			lookAt += direction;
+			eye += direction;
+		}
         else if(key == GLFW_KEY_J) {
 			rotAngle += 1.0;
         }
@@ -616,8 +669,20 @@ int main(int argc, char **argv) {
 	// GLEW setup
 	setupGLEW(window);
 
+	//initial variables
+	double mx, my;
+	glfwGetCursorPos(window, &mx, &my);
+	mousePos = glm::vec2(mx, my);
+
 	//set the key callback function
 	glfwSetKeyCallback(window, key_callback);
+
+	//set the mouse callback function
+	glfwSetCursorPosCallback(window, mouse_position_callback);
+
+	//hides the cursor
+	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
 	// Check OpenGL version
 	checkOpenGLVersion();
@@ -656,8 +721,10 @@ int main(int argc, char **argv) {
 		meshgls.push_back(mgl);
 	}
 
-	// Get the matrix location
+	// Get the matrix locations
 	GLint modelMatLoc = glGetUniformLocation(programID, "modelMat");
+	GLint viewMatLoc = glGetUniformLocation(programID, "viewMat");
+    GLint projMatLoc = glGetUniformLocation(programID, "projMat");
 
 	/*
 	// Create simple quad
@@ -683,6 +750,21 @@ int main(int argc, char **argv) {
 
 		// Use shader program
 		glUseProgram(programID);
+
+		glm::mat4 viewMat = glm::lookAt(eye, lookAt, glm::vec3(0,1,0));
+		glUniformMatrix4fv(viewMatLoc, 1, false, glm::value_ptr(viewMat));
+
+		glfwGetFramebufferSize(window, &fwidth, &fheight);
+		double aspectRatio;
+		if(fwidth == 0 || fheight == 0){
+			aspectRatio = 1.0;
+		}
+		else{
+			aspectRatio = fwidth/fheight;
+		}
+
+		glm::mat4 projMat = glm::perspective(glm::radians(90.0), aspectRatio, 0.01, 50.0);
+		glUniformMatrix4fv(projMatLoc, 1, false, glm::value_ptr(projMat));
 		
 		/*
 		// Draw objects
