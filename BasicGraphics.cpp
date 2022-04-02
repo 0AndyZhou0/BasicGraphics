@@ -21,6 +21,7 @@ using namespace std;
 struct Vertex {
 	glm::vec3 position;
 	glm::vec4 color;
+	glm::vec3 normal;
 };
 
 // Struct for holding mesh data
@@ -37,8 +38,15 @@ struct MeshGL {
 	int indexCnt = 0;
 };
 
+// Struct for holding PointLight mesh
+struct PointLight {
+	glm::vec4 pos;
+	glm::vec4 color;
+};
+
 //Global Variables
 float rotAngle = 0.0;
+PointLight light;
 
 glm::vec3 eye(0,0,1);
 glm::vec3 lookAt(0,0,0);
@@ -468,7 +476,7 @@ static void mouse_position_callback(GLFWwindow* window, double xpos, double ypos
 	//	ymov = 0;
 	//}
 
-	cout << xmov << " " << ymov << endl;
+	//cout << xmov << " " << ymov << endl;
 
 	int fw, fh;
     glfwGetFramebufferSize(window, &fw, &fh);
@@ -525,6 +533,19 @@ static void key_callback(GLFWwindow *window,
         else if(key == GLFW_KEY_K) {
 			rotAngle -= 1.0;
         }
+		else if(key == GLFW_KEY_1) {
+			light.color = glm::vec4(1.0,1.0,1.0,1.0);
+		}
+		else if(key == GLFW_KEY_2) {
+			light.color = glm::vec4(1.0,0.0,0.0,1.0);
+		}
+		else if(key == GLFW_KEY_3) {
+			light.color = glm::vec4(0.0,1.0,0.0,1.0);
+		}
+		else if(key == GLFW_KEY_4) {
+			light.color = glm::vec4(0.0,0.0,1.0,1.0);
+		}
+		//cout << light.color.r << " " << light.color.g << " " << light.color.b << "\n";
     }
 }
 
@@ -537,7 +558,8 @@ void extractMeshData(aiMesh *mesh, Mesh &m) {
 	for (int i = 0; i < mesh->mNumVertices; i++) {
 		Vertex v;
 		v.position = glm::vec3(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
-		v.color = glm::vec4(0.7, 0.2, 0.7, 1.0);
+		v.color = glm::vec4(1.0, 1.0, 0.0, 1.0);
+		v.normal = glm::vec3(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
 		m.vertices.push_back(v);
 	}
 	
@@ -568,6 +590,7 @@ void createMeshGL(Mesh &m, MeshGL &mgl) {
 	// Enable the first two vertex attribute arrays
 	glEnableVertexAttribArray(0);	// position
 	glEnableVertexAttribArray(1);	// color
+	glEnableVertexAttribArray(2);   // normal
 	
 	// Bind the VBO and set up data mappings so that VAO knows how to read it
 	// 0 = pos (3 elements)
@@ -577,6 +600,7 @@ void createMeshGL(Mesh &m, MeshGL &mgl) {
 	// Attribute, # of components, type, normalized?, stride, array buffer offset
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
 	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
 	
 	// Create Element Buffer Object (EBO)
 	glGenBuffers(1, &(mgl.EBO));
@@ -604,20 +628,26 @@ void renderScene(vector<MeshGL> &allMeshes,
 				aiNode *node,
 				glm::mat4 parentMat,
 				GLint modelMatLoc,
+				GLint normMatLoc,
+				glm::mat4 viewMat,
 				int level) {
 	aiMatrix4x4 transformation = node->mTransformation;
 	glm::mat4 nodeT;
 	aiMatToGLM4(transformation, nodeT);
 	glm::mat4 modelMat = parentMat*nodeT;
 	glm::mat4 R = makeRotateZ(modelMat[3]);
+
 	glm::mat4 tmpModel = R * modelMat;
 	glUniformMatrix4fv(modelMatLoc, 1, false, glm::value_ptr(tmpModel));
+
+	glm::mat3 normMat = glm::transpose(glm::inverse(glm::mat3(viewMat * tmpModel)));
+	glUniformMatrix3fv(normMatLoc, 1, false, glm::value_ptr(normMat));
 	for(int i = 0; i < node->mNumMeshes; i++){
 		int index = node->mMeshes[i];
 		drawMesh(allMeshes.at(index));
 	}
 	for(int i = 0; i < node->mNumChildren; i++){
-		renderScene(allMeshes, node->mChildren[i], modelMat, modelMatLoc, level + 1);
+		renderScene(allMeshes, node->mChildren[i], modelMat, modelMatLoc, normMatLoc, viewMat, level + 1);
 	}
 }
 
@@ -725,6 +755,13 @@ int main(int argc, char **argv) {
 	GLint modelMatLoc = glGetUniformLocation(programID, "modelMat");
 	GLint viewMatLoc = glGetUniformLocation(programID, "viewMat");
     GLint projMatLoc = glGetUniformLocation(programID, "projMat");
+	GLint normMatLoc = glGetUniformLocation(programID, "normMat");
+
+	//Setup light
+	light.pos =  glm::vec4(0.5, 0.5, 0.5, 1.0);
+	light.color =  glm::vec4(1.0, 1.0, 1.0, 1.0);
+	GLint lightPosLoc = glGetUniformLocation(programID, "light.pos");
+    GLint lightColorLoc = glGetUniformLocation(programID, "light.color");
 
 	/*
 	// Create simple quad
@@ -751,9 +788,6 @@ int main(int argc, char **argv) {
 		// Use shader program
 		glUseProgram(programID);
 
-		glm::mat4 viewMat = glm::lookAt(eye, lookAt, glm::vec3(0,1,0));
-		glUniformMatrix4fv(viewMatLoc, 1, false, glm::value_ptr(viewMat));
-
 		glfwGetFramebufferSize(window, &fwidth, &fheight);
 		double aspectRatio;
 		if(fwidth == 0 || fheight == 0){
@@ -763,8 +797,18 @@ int main(int argc, char **argv) {
 			aspectRatio = fwidth/fheight;
 		}
 
+		//Calculation of View Matrix
+		glm::mat4 viewMat = glm::lookAt(eye, lookAt, glm::vec3(0,1,0));
+		glUniformMatrix4fv(viewMatLoc, 1, false, glm::value_ptr(viewMat));
+
+		//Calculation of Projection Matrix
 		glm::mat4 projMat = glm::perspective(glm::radians(90.0), aspectRatio, 0.01, 50.0);
 		glUniformMatrix4fv(projMatLoc, 1, false, glm::value_ptr(projMat));
+
+		// Calculation of light
+		glm::vec4 lightPos = viewMat * light.pos;
+		glUniform4fv(lightPosLoc, 1, glm::value_ptr(light.pos));
+		glUniform4fv(lightColorLoc, 1, glm::value_ptr(light.color));
 		
 		/*
 		// Draw objects
@@ -773,7 +817,7 @@ int main(int argc, char **argv) {
 		}
 		*/
 
-		renderScene(meshgls, scene->mRootNode, glm::mat4(1.0), modelMatLoc, 0);
+		renderScene(meshgls, scene->mRootNode, glm::mat4(1.0), modelMatLoc, normMatLoc, viewMat, 0);
 
 		// Swap buffers and poll for window events		
 		glfwSwapBuffers(window);
