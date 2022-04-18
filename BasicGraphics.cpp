@@ -53,6 +53,9 @@ glm::vec3 lookAt(0,0,0);
 
 glm::vec2 mousePos;
 
+float metallic = 0.0;
+float roughness = 0.1;
+
 //Debugging Functions
 void aiMatToGLM4(aiMatrix4x4 &a, glm::mat4 &m) {
 	for(int i = 0; i < 4; i++) {
@@ -545,7 +548,18 @@ static void key_callback(GLFWwindow *window,
 		else if(key == GLFW_KEY_4) {
 			light.color = glm::vec4(0.0,0.0,1.0,1.0);
 		}
-		//cout << light.color.r << " " << light.color.g << " " << light.color.b << "\n";
+		else if(key == GLFW_KEY_V) {
+			metallic = max(0.0, metallic - 0.1);
+		}
+		else if(key == GLFW_KEY_B) {
+			metallic = min(1.0, metallic + 0.1);
+		}
+		else if(key == GLFW_KEY_N) {
+			roughness = max(0.1, roughness - 0.1);
+		}
+		else if(key == GLFW_KEY_M) {
+			roughness = min(0.7, roughness + 0.1);
+		}
     }
 }
 
@@ -763,6 +777,10 @@ int main(int argc, char **argv) {
 	GLint lightPosLoc = glGetUniformLocation(programID, "light.pos");
     GLint lightColorLoc = glGetUniformLocation(programID, "light.color");
 
+	//setup roughness and metallic
+	GLint roughnessLoc = glGetUniformLocation(programID, "roughness");
+	GLint metallicLoc = glGetUniformLocation(programID, "metallic");
+
 	/*
 	// Create simple quad
 	Mesh m;
@@ -809,6 +827,10 @@ int main(int argc, char **argv) {
 		glm::vec4 lightPos = viewMat * light.pos;
 		glUniform4fv(lightPosLoc, 1, glm::value_ptr(light.pos));
 		glUniform4fv(lightColorLoc, 1, glm::value_ptr(light.color));
+
+		// Calculation using Roughness and metallic
+		glUniform1f(roughnessLoc, roughness);
+		glUniform1f(metallicLoc, metallic);
 		
 		/*
 		// Draw objects
