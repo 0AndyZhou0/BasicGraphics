@@ -5,6 +5,8 @@ layout(location=0) out vec4 out_color;
 in vec4 vertexColor; // Now interpolated across face
 in vec4 interPos;
 in vec3 interNormal;
+in vec2 interUV;
+in vec3 interTangent;
 
 struct PointLight {
 vec4 pos;
@@ -16,6 +18,9 @@ uniform PointLight light;
 uniform float metallic;
 uniform float roughness;
 const float PI = 3.14159265359;
+
+uniform sampler2D diffuseTexture;
+uniform sampler2D normalTexture;
 
 vec3 getFresnelAtAngleZero(vec3 albedo, float metallic)
 {
@@ -54,26 +59,38 @@ float getGF(vec3 L, vec3 V, vec3 N, float roughness)
 
 void main()
 {	
+	vec3 texColor = vec3(texture(diffuseTexture, interUV));
+
 	//vec3 N = interNormal / (sqrt(interNormal[0]^2 + interNormal[1]^2 + interNormal[2]^2));
 	vec3 N = normalize(interNormal);
 
 	vec3 L = normalize(vec3(light.pos - interPos));
 
+	vec3 T = normalize(interTangent);
+    T = normalize(T - dot(T,N)*N);
+    vec3 B = normalize(cross(N,T));
+    vec3 texN = vec3(texture(normalTexture, interUV));
+    texN.x = texN.x*2.0f - 1.0f;
+    texN.y = texN.y*2.0f - 1.0f;
+    texN = normalize(texN);
+    mat3 toView = mat3(T,B,N);
+    N = normalize(toView*texN);
+
 	float diffuse = max(0, dot(N, L));
 
-	vec3 diffColor = diffuse * vec3(vertexColor * light.color);
+	vec3 diffColor = diffuse * texColor * vec3(light.color);
 	
 	//out_color = vec4(diffColor, 1.0);
 
 	vec3 V = normalize(-vec3(interPos));
-	vec3 F0 = getFresnelAtAngleZero(vec3(vertexColor), metallic);
+	vec3 F0 = getFresnelAtAngleZero(texColor, metallic);
 	vec3 H = normalize(L+V);
 	vec3 F = getFresnel(F0,L,H);
 	
 	vec3 kS = F;
 	vec3 kD = 1.0 - kS;
 	kD *= (1.0 - metallic);
-	kD *= vec3(vertexColor);
+	kD *= texColor;
 	kD /= PI;
 
 	float NDF = getNDF(H,N,roughness);

@@ -14,6 +14,8 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "glm/gtx/string_cast.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 using namespace std;
 
@@ -22,6 +24,8 @@ struct Vertex {
 	glm::vec3 position;
 	glm::vec4 color;
 	glm::vec3 normal;
+	glm::vec2 texcoords;
+	glm::vec3 tangent;
 };
 
 // Struct for holding mesh data
@@ -574,6 +578,9 @@ void extractMeshData(aiMesh *mesh, Mesh &m) {
 		v.position = glm::vec3(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
 		v.color = glm::vec4(1.0, 1.0, 0.0, 1.0);
 		v.normal = glm::vec3(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
+		v.texcoords = glm::vec2(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y);
+		v.tangent = glm::vec3(mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z);
+
 		m.vertices.push_back(v);
 	}
 	
@@ -605,6 +612,9 @@ void createMeshGL(Mesh &m, MeshGL &mgl) {
 	glEnableVertexAttribArray(0);	// position
 	glEnableVertexAttribArray(1);	// color
 	glEnableVertexAttribArray(2);   // normal
+	glEnableVertexAttribArray(3);   // texcoords
+	glEnableVertexAttribArray(4);   // tangent
+
 	
 	// Bind the VBO and set up data mappings so that VAO knows how to read it
 	// 0 = pos (3 elements)
@@ -615,6 +625,9 @@ void createMeshGL(Mesh &m, MeshGL &mgl) {
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
 	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
 	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+	glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texcoords));
+	glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, tangent));
+
 	
 	// Create Element Buffer Object (EBO)
 	glGenBuffers(1, &(mgl.EBO));
@@ -636,6 +649,46 @@ void drawMesh(MeshGL &mgl) {
 	glBindVertexArray(mgl.VAO);
 	glDrawElements(GL_TRIANGLES, mgl.indexCnt, GL_UNSIGNED_INT, (void*)0);
 	glBindVertexArray(0);		
+}
+
+unsigned int loadAndCreateTexture(string filename) {
+    int twidth, theight, tnumc;
+    stbi_set_flip_vertically_on_load(1);
+    unsigned char* tex_image = stbi_load(filename.c_str(), &twidth, &theight, &tnumc, 0);
+
+    if(!tex_image) {
+        cout << "COULD NOT LOAD TEXTURE: " << filename << endl;
+        glfwTerminate();
+        exit(1);
+    }
+
+    GLenum format;
+    if(tnumc == 3) {
+        format = GL_RGB;
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    }
+    else if(tnumc == 4) {
+        format = GL_RGBA;
+    }
+    else {
+        cout << "UNKNOWN NUMBER OF CHANNELS: " << tnumc << endl;
+        glfwTerminate();
+        exit(1);
+    }
+
+    unsigned int textureID = 0;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexImage2D(GL_TEXTURE_2D, 0, format, twidth, theight, 0, format, 
+                    GL_UNSIGNED_BYTE, tex_image);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    stbi_image_free(tex_image);
+
+    return textureID;
 }
 
 void renderScene(vector<MeshGL> &allMeshes,
@@ -696,7 +749,7 @@ int main(int argc, char **argv) {
 	
 	// Get aiscene with assimp
 	Assimp::Importer importer;
-	const aiScene* scene = importer.ReadFile(argv[1], aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals | aiProcess_JoinIdenticalVertices);
+	const aiScene* scene = importer.ReadFile(argv[1], aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_JoinIdenticalVertices | aiProcess_CalcTangentSpace);
 	
 	// Check if import was successful
 	if( (!scene) || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) || !(scene->mRootNode) ) {
@@ -781,6 +834,12 @@ int main(int argc, char **argv) {
 	GLint roughnessLoc = glGetUniformLocation(programID, "roughness");
 	GLint metallicLoc = glGetUniformLocation(programID, "metallic");
 
+	//setup texcoords and tangent
+	GLint diffuseTextureLoc = glGetUniformLocation(programID, "diffuseTexture");
+	GLint normalTextureLoc = glGetUniformLocation(programID, "normalTexture");
+	unsigned int diffuseID = loadAndCreateTexture("4977210.jpg");
+	unsigned int normalID = loadAndCreateTexture("./sampleModels/NormalMap.png");
+
 	/*
 	// Create simple quad
 	Mesh m;
@@ -831,6 +890,14 @@ int main(int argc, char **argv) {
 		// Calculation using Roughness and metallic
 		glUniform1f(roughnessLoc, roughness);
 		glUniform1f(metallicLoc, metallic);
+
+		// Calculation of Diffuse Texture and Tangents
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, diffuseID);
+		glUniform1i(diffuseTextureLoc, 0);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, normalID);
+		glUniform1i(normalTextureLoc, 1);
 		
 		/*
 		// Draw objects
